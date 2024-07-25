@@ -20,6 +20,10 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
     private DialogMode currentMode = null;
     private ArrayList<String> list = new ArrayList<>();
 
+    private UserInfo me;
+    private UserInfo she;
+    private int questionNumber; //номер вопроса
+
     public TinderBoltApp() {
         super(TELEGRAM_BOT_NAME, TELEGRAM_BOT_TOKEN);
     }
@@ -50,24 +54,95 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
         if (message.equals("/profile")) {
             currentMode = DialogMode.PROFILE;
             sendPhotoMessage("profile");
-            sendTextMessage("");
+
+            //обнуляем инфо о человеке
+            me = new UserInfo();
+            questionNumber = 1; //задаём 1ый вопрос
+            sendTextMessage("Сколько Вам лет?");
             return;
         }
 
-        if (currentMode == DialogMode.PROFILE) {
+        if (currentMode == DialogMode.PROFILE && !isMessageCommand()) {
+            //ответы на вопросы
+            switch (questionNumber) {
+                case 1:
+                    me.age = message;
+                    questionNumber = 2; //2ой вопрос
+                    sendTextMessage("Кем Вы работаете?");
+                    return;
+                case 2:
+                    me.occupation = message;
+                    questionNumber = 3; //3ий вопрос
+                    sendTextMessage("У Вас есть хобби?");
+                    return;
+                case 3:
+                    me.hobby = message;
+                    questionNumber = 4; //4ый вопрос
+                    sendTextMessage("Что Вам НЕ нравится в людях?");
+                    return;
+                case 4:
+                    me.annoys = message;
+                    questionNumber = 5; //5ый вопрос
+                    sendTextMessage("Цель знакомства?");
+                    return;
+                case 5:
+                    me.goals = message;
+                    //после ответа на последний вопрос отправляем все данныве в ChatGPT
+                    String aboutMyself = me.toString();
+                    String prompt = loadPrompt("profile");
+                    Message msg = sendTextMessage("Подождите пару секунд - ChatGPT \uD83E\uDDE0 думает...");
+                    String answer = chatGPT.sendMessage(prompt, aboutMyself);
+                    updateTextMessage(msg, answer); //меняем сообщение (что, на что)
+                    return;
+            }
 
+            return;
         }
 
 /* **** Режим OPENER ************************************************************************************************ */
         if (message.equals("/opener")) {
             currentMode = DialogMode.OPENER;
             sendPhotoMessage("opener");
-            sendTextMessage("");
+
+            she = new UserInfo();
+            questionNumber = 1; //задаём 1ый вопрос
+            sendTextMessage("Имя девушки?");
             return;
         }
 
-        if (currentMode == DialogMode.OPENER) {
-
+        if (currentMode == DialogMode.OPENER && !isMessageCommand()) {
+            switch (questionNumber) {
+                case 1:
+                    she.name = message;
+                    questionNumber = 2; //2ой вопрос
+                    sendTextMessage("Сколько Ей лет?");
+                    return;
+                case 2:
+                    she.age = message;
+                    questionNumber = 3; //3ий вопрос
+                    sendTextMessage("Есть ли у Неё хобби?");
+                    return;
+                case 3:
+                    she.hobby = message;
+                    questionNumber = 4; //4ый вопрос
+                    sendTextMessage("Кем Она работает?");
+                    return;
+                case 4:
+                    she.occupation = message;
+                    questionNumber = 5; //5ый вопрос
+                    sendTextMessage("Цель знакомства?");
+                    return;
+                case 5:
+                    she.goals = message;
+                    //после ответа на последний вопрос отправляем все данныве в ChatGPT
+                    Message msg = sendTextMessage("Подождите пару секунд - ChatGPT \uD83E\uDDE0 думает...");
+                    String aboutFriend = she.toString();
+                    String prompt = loadPrompt("opener");
+                    String answer = chatGPT.sendMessage(prompt, aboutFriend);
+                    updateTextMessage(msg, answer); //меняем сообщение (что, на что)
+                    return;
+            }
+            return;
         }
 
 /* **** Режим MESSAGE *********************************************************************************************** */
@@ -80,7 +155,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             return;
         }
 
-        if (currentMode == DialogMode.MESSAGE) {
+        if (currentMode == DialogMode.MESSAGE && !isMessageCommand()) {
             String query = getCallbackQueryButtonKey();
             if (query.startsWith("message_")) { //начинается с… “message_”
                 String prompt = loadPrompt(query);
@@ -112,7 +187,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             return;
         }
 
-        if (currentMode == DialogMode.DATE) {
+        if (currentMode == DialogMode.DATE && !isMessageCommand()) {
             String query = getCallbackQueryButtonKey();
             if (query.startsWith("date_")) { //начинается с… “date_”
                 sendPhotoMessage(query);
@@ -139,7 +214,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             return;
         }
 
-        if (currentMode == DialogMode.GPT) {
+        if (currentMode == DialogMode.GPT && !isMessageCommand()) {
             String prompt = loadPrompt("gpt");
             //включен режим GPT, т.е. сюда попадают сообщение для ChatGPT. Перенаправим их в ChatGPT:
             Message msg = sendTextMessage("Подождите пару секунд - ChatGPT думает...");
@@ -148,34 +223,6 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             updateTextMessage(msg, answer);
             return;
         }
-
-
-        // всякая всячина
-
-        sendTextMessage("Ищешь секретные команды? Лови! /cool - значит тебе зашёл наш чат-бот и ты хочешь быть в теме!");
-
-        if (message.equals("/cool")) {
-            sendPhotoMessage("avatar_main");
-            sendTextMessage("Согласен! Это самый крутой чат-бот в телеге!");
-            sendTextMessage("Хочешь быть с нами? Пиши email - пришлём секретную ссылку.");
-            return;
-        }
-
-        if (message.contains("@")) {
-            sendTextMessage("Шутишь что-ли?!");
-            sendTextMessage("Email: _" + message + "_ в списке запрещенных в ФБР, ЦРУ, АМБ и прочих спецслужб по всему миру!"); //_курсивом_ или *жирным*
-            sendTextMessage("Ты определенно нужен нам!");
-
-            //отправить сообщение с кнопками. пользователь нажимает на кнопку и в наш метод приходит её уникальное имя, так мы понимаем, что он нажал.
-            //но имя приходит не в виде текста, т.е. getMessageText() выдаст пустоту. А как понять, что нажал юзер? Разберем на след уроке.
-            sendTextButtonsMessage("Выберите режим работы:", "Морфеус", "btnGuru", "Нео", "btnMan", "Тринити", "btnWoman");
-            return;
-        }
-
-        sendTextMessage("Бла-бла-бла...");
-        sendTextMessage("Извини, но нам сейчас не до пустой болтовни.");
-        sendTextMessage("Слишком заняты марафоном!");
-
     }
 
     public static void main(String[] args) throws TelegramApiException {
@@ -183,3 +230,6 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
         telegramBotsApi.registerBot(new TinderBoltApp());
     }
 }
+
+
+
